@@ -52,35 +52,34 @@ void ColorTransition_linRGB2sRGB(const Mat &InputMat, Mat &OutputMat) {
   \brief Производит перобразование кластера цветов (точек в трехмерном пространстве) 
   по заданным параметрам.
   \param[in,out] data Кластер цветов, который требуется преобразовать 
-  \param[in] grey_point Серая точка кластера 
+  \param[in] mean Средняя точка кластера (центр масс) 
   \param[in] main_axis Главная ось кластера
 
   Данная функция переобразует кластер следующим образом:\n
+    - вычисляет серую точку\n
     - паралельно преносит кластер так, чтобы серая точка оказалась в нуле\n
     - масштабирует оси, в результате чего главная ось становиться коллинеарна 
     галавной диагонали куба\n
     - паралельно преносит кластер на вектор (1/2, 1/2, 1/2).
 */
-void Correction(Mat &data, const Mat &grey_point, const Mat &main_axis) {
-  float c_arr[] = {1. / 2., 1. / 2., 1. / 2.}; 
-  Mat center_cube(1, 3, CV_32F, c_arr), scaling_mat = Mat::zeros(3, 3, CV_32F);
-  float sum = main_axis.at<float>(0, 0) + main_axis.at<float>(0, 1) +
-              main_axis.at<float>(0, 2);
-  scaling_mat.at<float>(0, 0) = sum / (3 * main_axis.at<float>(0, 0));
-  scaling_mat.at<float>(1, 1) = sum / (3 * main_axis.at<float>(0, 1));
-  scaling_mat.at<float>(2, 2) = sum / (3 * main_axis.at<float>(0, 2));
+void Correction(Mat &data, const Scalar &mean, const Scalar &main_axis) {
+  Scalar grey_point; 
+  Scalar center_cube(1. / 2., 1. / 2., 1. / 2.);
+  Scalar normal_vector(1. / sqrt(3), 1. / sqrt(3), 1. / sqrt(3));
+  grey_point = normal_vector.dot(center_cube - mean) * main_axis;
+  grey_point = mean + grey_point / normal_vector.dot(main_axis); 
 
-  data.reshape(3,0).forEach<Vec3f>(
-    [&](Vec3f &pixel, const int position[]) -> void {
-      pixel = pixel - Mat_<Vec3f>(grey_point)(0,0);
-    }
-  );
-  data = Mat(data * scaling_mat);
-  data.reshape(3,0).forEach<Vec3f>(
-    [&](Vec3f &pixel, const int position[]) -> void {
-      pixel = pixel + Mat_<Vec3f>(center_cube)(0,0);
-    }
-  );
+  Mat scaling_mat = Mat::eye(3, 3, CV_32F);
+  float sum = main_axis.dot(Scalar(1,1,1));
+  scaling_mat *= sum / 3;
+  scaling_mat.at<float>(0, 0) /= (main_axis[0]);
+  scaling_mat.at<float>(1, 1) /= (main_axis[1]);
+  scaling_mat.at<float>(2, 2) /= (main_axis[2]);
+
+  data = data.reshape(3,0) - grey_point;
+  data = data.reshape(1,0) * scaling_mat;
+  data = data.reshape(3,0) + center_cube;
+  data = data.reshape(1,0);
 }
 
 /*!
@@ -99,23 +98,10 @@ void PcaColorCorrection(const Mat &image, Mat &PCA_image) {
   //формат необходимый для встроенного PCA
   data = Mat(Mat(PCA_image.t()).reshape(0, 1).t()).reshape(1, 0);
   PCA pca(data, Mat(), CV_PCA_DATA_AS_ROW, 1);
-
-  Mat grey_point(1, 3, CV_32F), mean(1, 3, CV_32F), main_axis(1, 3, CV_32F);
-  float d_arr[] = {1. / sqrt(3), 1. / sqrt(3), 1. / sqrt(3)};
-  float c_arr[] = {1. / 2., 1. / 2., 1. / 2.};
-  Mat center_cube(1, 3, CV_32F, c_arr), normal_vector(1, 3, CV_32F, d_arr);
-  main_axis = pca.eigenvectors; 
-  mean = pca.mean;       
-
-  MatExpr expr1, expr3, expr4;
-  float expr2;
-  //вычисление grey_point
-  expr1 = (center_cube - mean).t();
-  expr2 = 1. / (Mat_<float>(normal_vector * (main_axis.t()))(0, 0));
-  expr3 = normal_vector * expr1 * expr2;
-  expr4 = mean + main_axis * Mat_<float>(expr3)(0, 0);
-  grey_point = expr4;
-  Correction(data, grey_point, main_axis);
+  Scalar mean(Mat_<Vec3f>(pca.mean)(0,0));
+  Scalar main_axis(Mat_<Vec3f>(pca.eigenvectors)(0,0));
+ 
+  Correction(data, mean, main_axis);
   PCA_image = Mat(data.reshape(0, nCols).reshape(3, 0).t());
   ColorTransition_linRGB2sRGB(PCA_image, PCA_image);
 }
