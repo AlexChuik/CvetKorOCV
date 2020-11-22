@@ -6,7 +6,8 @@
   \param[out] OutputMat Выходящее изображение  с цветами пикселей в linRGB
   \param[in] InputMat Входящее изображение с цветами пикселей в sRGB
 
-  Принимает матрицу с форматом CV_8UC3, выдает матрицу того же размера CV_32FC3
+  Принимает матрицу с форматом CV_8UC3, выдает матрицу того же размера CV_32FC3.\n
+  (B,G,R) -> (b,g,r)
 */
 void ColorTransition_sRGB2linRGB(const Mat &InputMat, Mat &OutputMat) { 
   float lut[256];
@@ -14,12 +15,10 @@ void ColorTransition_sRGB2linRGB(const Mat &InputMat, Mat &OutputMat) {
     if ((float)i/255 <= 0.04045) lut[i] = (float)i / 255 / (12.92);
     else lut[i] = pow(((float)i / 255 + 0.055) / 1.055, 2.4);
   }
-  OutputMat.forEach<Vec3f>(
-    [&](Vec3f &pixel, const int position[]) -> void
-    {
-      pixel[0] = lut[InputMat.at<Vec3b>(position[0], position[1])[0]];
-      pixel[1] = lut[InputMat.at<Vec3b>(position[0], position[1])[1]];
-      pixel[2] = lut[InputMat.at<Vec3b>(position[0], position[1])[2]];
+  Mat T = InputMat.reshape(1,0);
+  OutputMat.reshape(1,0).forEach<float>(
+    [&](float &pixel, const int position[]) -> void {
+        pixel = lut[T.at<uchar>(position[0], position[1])];                           
     }
   );
 }
@@ -29,29 +28,90 @@ void ColorTransition_sRGB2linRGB(const Mat &InputMat, Mat &OutputMat) {
   \param[out] OutputMat Выходящее изображение  с цветами пикселей в sRGB 
   \param[in] InputMat Входящее изображение с цветами пикселей в linRGB
 
-  Принимает матрицу с форматом CV_32FC3, выдает матрицу того же размера CV_32FC3
+  Принимает матрицу с форматом CV_32FC3, выдает матрицу того же размера CV_32FC3.\n
+  (b,g,r) -> (B,G,R)
 */
 void ColorTransition_linRGB2sRGB(const Mat &InputMat, Mat &OutputMat) { 
-  OutputMat.forEach<Vec3f> 
-  (
-    [&](Vec3f &pixel, const int position[]) -> void
-    {
-      for (int i = 0; i < 3; i++) {
-        if (InputMat.at<Vec3f>(position[0], position[1])[i] <= 0.0031308)
-          pixel[i] = InputMat.at<Vec3f>(position[0], position[1])[i]* 
-                      (12.92);
-        else
-          pixel[i] = pow(InputMat.at<Vec3f>(position[0], position[1])[i],
-                      1. / 2.4) * (1.055) - 0.055;
-      }                                 
+  Mat T = InputMat.reshape(1,0);
+  OutputMat.reshape(1,0).forEach<float>(
+    [&](float &pixel, const int position[]) -> void {
+      if (T.at<float>(position[0], position[1]) <= 0.0031308)
+        pixel = T.at<float>(position[0], position[1]) * 
+                (12.92);
+      else
+        pixel = pow(T.at<float>(position[0], position[1]),
+                1. / 2.4) * (1.055) - 0.055;                                
     }
   );
 }
 
 /*!
+  \brief Переводит цвета пикселей из linRGB в lab.
+  \param[out] OutputMat Выходящее изображение  с цветами пикселей в lab
+  \param[in] InputMat Входящее изображение с цветами пикселей в linRGB
+
+  Принимает матрицу с форматом CV_32FC3, выдает матрицу того же размера CV_32FC3.\n
+  (учитывает что порядок обратный (b,g,r), выдает в правильном (l,a,b))
+*/
+void ColorTransition_linRGB2lab(const Mat &InputMat, Mat &OutputMat) {
+  Mat temp(InputMat.size(), CV_32FC3);
+  temp = InputMat.clone();
+  OutputMat.forEach<Vec3f>(
+    [&](Vec3f &pixel, const int position[]) -> void {
+      pixel[1] = (temp.at<Vec3f>(position[0], position[1])[2] - 
+                  temp.at<Vec3f>(position[0], position[1])[1]) / sqrt(2); 
+      pixel[2] = (2 * temp.at<Vec3f>(position[0], position[1])[0] - 
+                  temp.at<Vec3f>(position[0], position[1])[2] - 
+                  temp.at<Vec3f>(position[0], position[1])[1]) / sqrt(6);                              
+      pixel[0] = (temp.at<Vec3f>(position[0], position[1])[2] + 
+                  temp.at<Vec3f>(position[0], position[1])[1] + 
+                  temp.at<Vec3f>(position[0], position[1])[0]) / sqrt(3);   
+    }
+  );
+}
+
+/*!
+  \brief Переводит цвета пикселей из linRGB в lab.
+  \param[out] OutputMat Выходящее изображение  с цветами пикселей в linRGB
+  \param[in] InputMat Входящее изображение с цветами пикселей в lab
+
+  Принимает матрицу с форматом CV_32FC3, выдает матрицу того же размера CV_32FC3.\n
+  (l,a,b) -> (b,g,r)
+*/
+void ColorTransition_lab2linRGB(const Mat &InputMat, Mat &OutputMat) {
+  Mat temp(InputMat.size(), CV_32FC3);
+  temp = InputMat.clone();
+  OutputMat.forEach<Vec3f>(
+    [&](Vec3f &pixel, const int position[]) -> void {
+      pixel[0] = (sqrt(2) * temp.at<Vec3f>(position[0], position[1])[0] + 
+                  2 * temp.at<Vec3f>(position[0], position[1])[2]) / sqrt(6); 
+      pixel[1] = (sqrt(2) * temp.at<Vec3f>(position[0], position[1])[0] -
+                  sqrt(3) * temp.at<Vec3f>(position[0], position[1])[1] - 
+                  temp.at<Vec3f>(position[0], position[1])[2]) / sqrt(6);                              
+      pixel[2] = (sqrt(2) * temp.at<Vec3f>(position[0], position[1])[0] + 
+                  sqrt(3) * temp.at<Vec3f>(position[0], position[1])[1] - 
+                  temp.at<Vec3f>(position[0], position[1])[2]) / sqrt(6);                                                           
+    }
+  );
+}
+
+/*!
+  \brief Перегрузка для Scalar.
+*/
+void ColorTransition_lab2linRGB(const Scalar &input_pixel, 
+                                Scalar &output_pixel) {
+  Scalar temp = input_pixel;
+  output_pixel[0] = (sqrt(2) * temp[0] + 2 * temp[2]) / sqrt(6); 
+  output_pixel[1] = (sqrt(2) * temp[0] - sqrt(3) * temp[1] - 
+                     temp[2]) / sqrt(6);                              
+  output_pixel[2] = (sqrt(2) * temp[0] + sqrt(3) * temp[1] - 
+                     temp[2]) / sqrt(6);                                                           
+}
+
+/*!
   \brief Производит перобразование кластера цветов (точек в трехмерном пространстве) 
   по заданным параметрам.
-  \param[in,out] data Кластер цветов, который требуется преобразовать 
+  \param[in,out] data Кластер цветов в столбец, который требуется преобразовать 
   \param[in] mean Средняя точка кластера (центр масс) 
   \param[in] main_axis Главная ось кластера
 
@@ -69,16 +129,10 @@ void Correction(Mat &data, const Scalar &mean, const Scalar &main_axis) {
   grey_point = normal_vector.dot(center_cube - mean) * main_axis;
   grey_point = mean + grey_point / normal_vector.dot(main_axis); 
 
-  Mat scaling_mat = Mat::eye(3, 3, CV_32F);
   float sum = main_axis.dot(Scalar(1,1,1));
-  scaling_mat *= sum / 3;
-  scaling_mat.at<float>(0, 0) /= (main_axis[0]);
-  scaling_mat.at<float>(1, 1) /= (main_axis[1]);
-  scaling_mat.at<float>(2, 2) /= (main_axis[2]);
-
   data = data.reshape(3,0) - grey_point;
-  data = data.reshape(1,0) * scaling_mat;
-  data = data.reshape(3,0) + center_cube;
+  multiply(data, Scalar(1,1,1).div(main_axis), data, sum / 3);
+  data = data + center_cube;
   data = data.reshape(1,0);
 }
 
@@ -105,15 +159,14 @@ void PcaColorCorrection(const Mat &image, Mat &PCA_image) {
   PCA_image = Mat(data.reshape(0, nCols).reshape(3, 0).t());
   ColorTransition_linRGB2sRGB(PCA_image, PCA_image);
 }
+
 int main(int argc, char **argv) {
-  if (argc != 2)
-  {
+  if (argc != 2) {
     cout << "Usage: " << argv[0] << " <Input image>" << endl;
     return -1;
   }
   Mat image = imread(argv[1], IMREAD_COLOR);
-  if (image.empty())
-  {
+  if (image.empty()) {
     cout << "Could not open or find the image\n"
          << endl;
     cout << "Usage: " << argv[0] << " <Input image>" << endl;
@@ -121,10 +174,13 @@ int main(int argc, char **argv) {
   }
 
   Mat PCA_image(image.size(), CV_32FC3);
+  Mat Hough_image(image.size(), CV_32FC3);
   PcaColorCorrection(image, PCA_image);
+  HoughColorCorrection(image, Hough_image);
 
   imshow("Original Image", image);
-  imshow("New Image", PCA_image);
+  imshow("PCA correction", PCA_image);
+  imshow("Hough correction", Hough_image);
   waitKey();
   return 0;
 }
