@@ -24,7 +24,7 @@ if(CMAKE_VERSION VERSION_LESS "2.8.11")
   include_directories(${OpenCV_INCLUDE_DIRS})
 endif()
 
-set(SOURCE main.cpp)
+set(SOURCE main.cpp FHT.cpp)
 set(LIB "")
 # Declare the executable target built from your sources
 add_executable(proba ${SOURCE})
