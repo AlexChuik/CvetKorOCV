@@ -62,9 +62,9 @@ void HoughTransformation(Mat &Plane, int step = 1) {
   (kDiscretization, [0, kDiscretization]).
 */
 void HoughAnalysis(Mat &Plane, Scalar &point_1, Scalar &point_2) {
-  double max;
+  double max(0);
   double max_copy(0);
-  Point max_point;
+  Point max_point(0, 0);
   Mat Plane_copy = Plane.clone();
   HoughTransformation(Plane_copy);
   minMaxLoc(Plane_copy, NULL, &max, NULL, &max_point);
@@ -93,7 +93,7 @@ void HoughAnalysis(Mat &Plane, Scalar &point_1, Scalar &point_2) {
 void HoughColorCorrection(const Mat &image, Mat &Hough_image) {
   ColorTransition_sRGB2linRGB(image, Hough_image);
   ColorTransition_linRGB2lab(Hough_image, Hough_image);
-  float sigma = 3;  //парметр для размытия
+  float sigma(3);  //парметр для размытия
   Mat la = Mat::zeros(Size(kDiscretization, kDiscretization), CV_32F);
   Mat lb = Mat::zeros(Size(kDiscretization, kDiscretization), CV_32F);
   //проецирую на плоскости la и lb
