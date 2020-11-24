@@ -3,6 +3,7 @@
 #define MAIN_H_
 
 #include <iostream>
+#include <array>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/highgui.hpp"
@@ -25,4 +26,15 @@ void MyAdd(Mat &OutputMat, const Mat &Add1, const Mat &Add2, int shift);
 void HoughTransformation(Mat &Plane, int step);
 void HoughAnalysis(Mat &Plane, Scalar &point_1, Scalar &point_2);
 void HoughColorCorrection(const Mat &image, Mat &Hough_image);
+
+/*!
+  \brief Синглтон для таблицы подстановки.
+*/
+class LutSrgb2Linrgb {
+ public:
+  std::array<float, 256> lut;
+  static LutSrgb2Linrgb& instance();
+ private:
+  LutSrgb2Linrgb();
+};
 #endif

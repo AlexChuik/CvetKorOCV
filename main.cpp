@@ -1,6 +1,17 @@
 /*! \file */
 #include "main.hpp"
 
+LutSrgb2Linrgb::LutSrgb2Linrgb() {
+  for (int i = 0; i < 256; i++) {
+    if ((float)i/255 <= 0.04045) lut[i] = (float)i / 255 / (12.92);
+    else lut[i] = pow(((float)i / 255 + 0.055) / 1.055, 2.4);
+  }
+}
+LutSrgb2Linrgb& LutSrgb2Linrgb::instance() {
+  static LutSrgb2Linrgb instance;
+  return instance;
+}
+
 /*!
   \brief Переводит цвета пикселей из sRGB в linRGB.
   \param[out] OutputMat Выходящее изображение  с цветами пикселей в linRGB
@@ -10,15 +21,11 @@
   (B,G,R) -> (b,g,r)
 */
 void ColorTransition_sRGB2linRGB(const Mat &InputMat, Mat &OutputMat) { 
-  float lut[256];
-  for (int i = 0; i < 256; i++) {
-    if ((float)i/255 <= 0.04045) lut[i] = (float)i / 255 / (12.92);
-    else lut[i] = pow(((float)i / 255 + 0.055) / 1.055, 2.4);
-  }
   Mat T = InputMat.reshape(1,0);
   OutputMat.reshape(1,0).forEach<float>(
     [&](float &pixel, const int position[]) -> void {
-        pixel = lut[T.at<uchar>(position[0], position[1])];                           
+        pixel = LutSrgb2Linrgb::instance().lut
+                [T.at<uchar>(position[0], position[1])];                           
     }
   );
 }
@@ -123,7 +130,7 @@ void ColorTransition_lab2linRGB(const Scalar &input_pixel,
     - паралельно преносит кластер на вектор (1/2, 1/2, 1/2).
 */
 void Correction(Mat &data, const Scalar &mean, const Scalar &main_axis) {
-  Scalar grey_point; 
+  Scalar grey_point(0); 
   Scalar center_cube(1. / 2., 1. / 2., 1. / 2.);
   Scalar normal_vector(1. / sqrt(3), 1. / sqrt(3), 1. / sqrt(3));
   grey_point = normal_vector.dot(center_cube - mean) * main_axis;
