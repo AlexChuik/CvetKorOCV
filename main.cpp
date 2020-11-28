@@ -1,10 +1,11 @@
 /*! \file */
 #include "main.hpp"
 
+LutSrgb2Linrgb::~LutSrgb2Linrgb() {}
 LutSrgb2Linrgb::LutSrgb2Linrgb() {
   for (int i = 0; i < 256; i++) {
-    if ((float)i/255 <= 0.04045) lut[i] = (float)i / 255 / (12.92);
-    else lut[i] = pow(((float)i / 255 + 0.055) / 1.055, 2.4);
+    if ((float)i/255.0f <= 0.04045f) lut[i] = (float)i / 255.0f / (12.92f);
+    else lut[i] = pow(((float)i / 255.0f + 0.055f) / 1.055f, 2.4f);
   }
 }
 LutSrgb2Linrgb& LutSrgb2Linrgb::instance() {
@@ -42,12 +43,12 @@ void ColorTransition_linRGB2sRGB(const Mat &InputMat, Mat &OutputMat) {
   Mat T = InputMat.reshape(1,0);
   OutputMat.reshape(1,0).forEach<float>(
     [&](float &pixel, const int position[]) -> void {
-      if (T.at<float>(position[0], position[1]) <= 0.0031308)
+      if (T.at<float>(position[0], position[1]) <= 0.0031308f)
         pixel = T.at<float>(position[0], position[1]) * 
-                (12.92);
+                (12.92f);
       else
         pixel = pow(T.at<float>(position[0], position[1]),
-                1. / 2.4) * (1.055) - 0.055;                                
+                1.0f / 2.4f) * (1.055f) - 0.055f;                                
     }
   );
 }
@@ -62,17 +63,16 @@ void ColorTransition_linRGB2sRGB(const Mat &InputMat, Mat &OutputMat) {
 */
 void ColorTransition_linRGB2lab(const Mat &InputMat, Mat &OutputMat) {
   Mat temp(InputMat.size(), CV_32FC3);
-  temp = InputMat.clone();
+  temp = InputMat.clone(); 
   OutputMat.forEach<Vec3f>(
     [&](Vec3f &pixel, const int position[]) -> void {
-      pixel[1] = (temp.at<Vec3f>(position[0], position[1])[2] - 
-                  temp.at<Vec3f>(position[0], position[1])[1]) / sqrt(2); 
-      pixel[2] = (2 * temp.at<Vec3f>(position[0], position[1])[0] - 
-                  temp.at<Vec3f>(position[0], position[1])[2] - 
-                  temp.at<Vec3f>(position[0], position[1])[1]) / sqrt(6);                              
-      pixel[0] = (temp.at<Vec3f>(position[0], position[1])[2] + 
-                  temp.at<Vec3f>(position[0], position[1])[1] + 
-                  temp.at<Vec3f>(position[0], position[1])[0]) / sqrt(3);   
+      Vec3f temp_pixel = temp.at<Vec3f>(position[0], position[1]);
+      pixel[1] = (temp_pixel[2] - temp_pixel[1]) 
+                 / kSqrt2; 
+      pixel[2] = (2 * temp_pixel[0] - temp_pixel[2] - 
+                  temp_pixel[1]) / kSqrt6;                              
+      pixel[0] = (temp_pixel[2] + temp_pixel[1] + 
+                  temp_pixel[0]) / kSqrt3;   
     }
   );
 }
@@ -90,14 +90,13 @@ void ColorTransition_lab2linRGB(const Mat &InputMat, Mat &OutputMat) {
   temp = InputMat.clone();
   OutputMat.forEach<Vec3f>(
     [&](Vec3f &pixel, const int position[]) -> void {
-      pixel[0] = (sqrt(2) * temp.at<Vec3f>(position[0], position[1])[0] + 
-                  2 * temp.at<Vec3f>(position[0], position[1])[2]) / sqrt(6); 
-      pixel[1] = (sqrt(2) * temp.at<Vec3f>(position[0], position[1])[0] -
-                  sqrt(3) * temp.at<Vec3f>(position[0], position[1])[1] - 
-                  temp.at<Vec3f>(position[0], position[1])[2]) / sqrt(6);                              
-      pixel[2] = (sqrt(2) * temp.at<Vec3f>(position[0], position[1])[0] + 
-                  sqrt(3) * temp.at<Vec3f>(position[0], position[1])[1] - 
-                  temp.at<Vec3f>(position[0], position[1])[2]) / sqrt(6);                                                           
+      Vec3f temp_pixel = temp.at<Vec3f>(position[0], position[1]);
+      pixel[0] = (kSqrt2 * temp_pixel[0] + 2 * temp_pixel[2]) 
+                 / kSqrt6; 
+      pixel[1] = (kSqrt2 * temp_pixel[0] - kSqrt3 * temp_pixel[1] - 
+                  temp_pixel[2]) / kSqrt6;                              
+      pixel[2] = (kSqrt2 * temp_pixel[0] + kSqrt3 * temp_pixel[1] - 
+                  temp_pixel[2]) / kSqrt6;                                                           
     }
   );
 }
@@ -108,11 +107,12 @@ void ColorTransition_lab2linRGB(const Mat &InputMat, Mat &OutputMat) {
 void ColorTransition_lab2linRGB(const Scalar &input_pixel, 
                                 Scalar &output_pixel) {
   Scalar temp = input_pixel;
-  output_pixel[0] = (sqrt(2) * temp[0] + 2 * temp[2]) / sqrt(6); 
-  output_pixel[1] = (sqrt(2) * temp[0] - sqrt(3) * temp[1] - 
-                     temp[2]) / sqrt(6);                              
-  output_pixel[2] = (sqrt(2) * temp[0] + sqrt(3) * temp[1] - 
-                     temp[2]) / sqrt(6);                                                           
+  output_pixel[0] = (kSqrt2 * temp[0] + 2 * temp[2]) 
+                    / kSqrt6; 
+  output_pixel[1] = (kSqrt2 * temp[0] - kSqrt3 * temp[1] - 
+                     temp[2]) / kSqrt6;                              
+  output_pixel[2] = (kSqrt2 * temp[0] + kSqrt3 * temp[1] - 
+                     temp[2]) / kSqrt6;                                                           
 }
 
 /*!
@@ -131,14 +131,15 @@ void ColorTransition_lab2linRGB(const Scalar &input_pixel,
 */
 void Correction(Mat &data, const Scalar &mean, const Scalar &main_axis) {
   Scalar grey_point(0); 
-  Scalar center_cube(1. / 2., 1. / 2., 1. / 2.);
-  Scalar normal_vector(1. / sqrt(3), 1. / sqrt(3), 1. / sqrt(3));
+  Scalar center_cube(1.0f / 2.0f, 1.0f / 2.0f, 1.0f / 2.0f);
+  Scalar normal_vector(1.0f / kSqrt3, 1.0f / kSqrt3, 
+                       1.0f / kSqrt3);
   grey_point = normal_vector.dot(center_cube - mean) * main_axis;
   grey_point = mean + grey_point / normal_vector.dot(main_axis); 
 
   float sum = main_axis.dot(Scalar(1,1,1));
   data = data.reshape(3,0) - grey_point;
-  multiply(data, Scalar(1,1,1).div(main_axis), data, sum / 3);
+  multiply(data, Scalar(1,1,1).div(main_axis), data, sum / 3.0f);
   data = data + center_cube;
   data = data.reshape(1,0);
 }

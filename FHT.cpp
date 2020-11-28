@@ -1,18 +1,6 @@
 /*! \file */
 #include "main.hpp"
 
-//параметр дискретизации
-const int kDiscretization = 512;
-
-/*!
-  \brief Вспомогательная функция для проецирования на плоскости la и lb
-*/
-float f (int k) {
-    if (k == 0) return sqrt(2);
-    if (k == 1) return 4./sqrt(6);
-    return 3./sqrt(3);
-}
-
 /*!
   \brief Поэлементная сумма с сдвигом(зацикленным) по колонкам.
   \param[out] OutputMat Результат сложения
@@ -37,13 +25,13 @@ void MyAdd(Mat &OutputMat, const Mat &Add1, const Mat &Add2, int shift) {
 void HoughTransformation(Mat &Plane, int step = 1) {
   if (step == kDiscretization) return;
   Mat temp = Plane.clone();
-  for (int k = 0; k < kDiscretization; k += 2*step) {
-    Mat temp_k(temp, Rect(0, k, Plane.cols, 2*step));
+  for (int k = 0; k < kDiscretization; k += 2 * step) {
+    Mat temp_k(temp, Rect(0, k, Plane.cols, 2 * step));
     for (int i = 0; i < step; i++) {
-      Mat plane_ki1 = Plane(Rect(0, k, Plane.cols, 2*step)).row(2 * i);
-      Mat plane_ki2 = Plane(Rect(0, k, Plane.cols, 2*step)).row(2 * i +1);
+      Mat plane_ki1 = Plane(Rect(0, k, Plane.cols, 2 * step)).row(2 * i);
+      Mat plane_ki2 = Plane(Rect(0, k, Plane.cols, 2 * step)).row(2 * i + 1);
       MyAdd(plane_ki1, temp_k.row(i), temp_k.row(i + step), i); 
-      MyAdd(plane_ki2, temp_k.row(i), temp_k.row(i + step), i+1);  
+      MyAdd(plane_ki2, temp_k.row(i), temp_k.row(i + step), i + 1);  
     }
   }
   step *= 2;
@@ -93,24 +81,23 @@ void HoughAnalysis(Mat &Plane, Scalar &point_1, Scalar &point_2) {
 void HoughColorCorrection(const Mat &image, Mat &Hough_image) {
   ColorTransition_sRGB2linRGB(image, Hough_image);
   ColorTransition_linRGB2lab(Hough_image, Hough_image);
-  float sigma(3);  //парметр для размытия
+  float sigma(3.0f);  //параметр для размытия
   Mat la = Mat::zeros(Size(kDiscretization, kDiscretization), CV_32F);
   Mat lb = Mat::zeros(Size(kDiscretization, kDiscretization), CV_32F);
   //проецирую на плоскости la и lb
   Hough_image.forEach<Vec3f>(
     [&](Vec3f &pixel, const int position[]) -> void {
-      la.at<float>((int)(pixel[0] * kDiscretization / f(2)), 
-                   (int)(pixel[1] * kDiscretization / f(0) + 
-                   kDiscretization / 2)) += 0.01; 
-      lb.at<float>((int)(pixel[0] * kDiscretization / f(2)), 
-                   (int)(pixel[2] * kDiscretization / f(1) + 
-                   kDiscretization / 2)) += 0.01;   
+      la.at<float>((int)(pixel[0] * kDiscretization / kLAxisLenght), 
+                   (int)(pixel[1] * kDiscretization / kAlphaAxisLenght + 
+                   kDiscretization / 2.0f)) += 0.01f; 
+      lb.at<float>((int)(pixel[0] * kDiscretization / kLAxisLenght), 
+                   (int)(pixel[2] * kDiscretization / kBetaAxisLenght + 
+                   kDiscretization / 2.0f)) += 0.01f;   
     }
   );
-  GaussianBlur(la, la, Size((int)(6 * sigma) + ((int)(6 * sigma) + 1) % 2,
-               (int)(6 * sigma) + ((int)(6 * sigma) + 1) % 2), sigma, sigma);
-  GaussianBlur(lb, lb, Size((int)(6 * sigma) + ((int)(6 * sigma) + 1) % 2,
-               (int)(6 * sigma) + ((int)(6 * sigma) + 1) % 2), sigma, sigma);
+  int wight_window = (int)(6 * sigma) + ((int)(6 * sigma) + 1) % 2;
+  GaussianBlur(la, la, Size(wight_window, wight_window), sigma, sigma);
+  GaussianBlur(lb, lb, Size(wight_window, wight_window), sigma, sigma);
   Scalar la_point_1(0,0,0), la_point_2(0,0,0);
   Scalar lb_point_1(0,0,0), lb_point_2(0,0,0);
   Scalar main_axis(1,1,1);
@@ -119,12 +106,17 @@ void HoughColorCorrection(const Mat &image, Mat &Hough_image) {
   HoughAnalysis(lb, lb_point_1, lb_point_2);
 
   //получение точки и оси из дискретных координат осей на проекциях
-  general_point[0] = 0;
-  general_point[1] = la_point_1[1] * f(0) / kDiscretization - f(0) / 2;
-  general_point[2] = lb_point_1[1] * f(1) / kDiscretization - f(1) / 2;
-  main_axis[0] = f(2);
-  main_axis[1] = la_point_2[1] * f(0) / kDiscretization - f(0) / 2;
-  main_axis[2] = lb_point_2[1] * f(1) / kDiscretization - f(1) / 2;
+  general_point[0] = 0.0f;
+  general_point[1] = la_point_1[1] * kAlphaAxisLenght / kDiscretization - 
+                     kAlphaAxisLenght / 2.0f;
+  general_point[2] = lb_point_1[1] * kBetaAxisLenght / kDiscretization - 
+                     kBetaAxisLenght / 2.0f;
+                     
+  main_axis[0] = kLAxisLenght;
+  main_axis[1] = la_point_2[1] * kAlphaAxisLenght / kDiscretization - 
+                 kAlphaAxisLenght / 2.0f;
+  main_axis[2] = lb_point_2[1] * kBetaAxisLenght / kDiscretization - 
+                 kBetaAxisLenght / 2.0f;
   main_axis = main_axis - general_point;
   
   ColorTransition_lab2linRGB(general_point, general_point);
